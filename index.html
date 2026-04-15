@@ -404,9 +404,9 @@
                         <strong>Live-Eingabe für Schüler</strong><br>
                         Scannt den Code, um Wünsche vom Handy zu senden:
                     </div>
-                    <div id="qrcode-container" class="qr-container" style="cursor: zoom-in;" onclick="toggleQRModal()">
                         <div id="qrcode"></div>
                         <span id="lobby-id" class="status-badge">Verbinde...</span>
+                        <div id="connected-count" style="font-size: 0.75rem; color: var(--success); margin-top: 5px; font-weight: bold;">Verbundene Schüler: 0</div>
                         <div style="font-size: 0.6rem; color: #64748b; margin-top: 5px;">Klicken zum Vergrößern</div>
                     </div>
                 </div>
@@ -472,8 +472,19 @@
 
     <script>
         // --- PeerJS & QR Setup ---
+        const PEER_CONFIG = {
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
+        };
+
         let peer = null;
         let conn = null;
+        let connectedPeers = new Set();
         const urlParams = new URLSearchParams(window.location.search);
         const hostId = urlParams.get('host');
 
@@ -488,7 +499,8 @@
         }
 
         function initTeacherMode() {
-            peer = new Peer();
+            peer = new Peer(undefined, PEER_CONFIG);
+            
             peer.on('open', (id) => {
                 document.getElementById('lobby-id').innerText = "Bereit (Code aktiv)";
                 let currentUrl = window.location.href.split('?')[0];
@@ -526,12 +538,33 @@
             });
 
             peer.on('connection', (c) => {
+                c.on('open', () => {
+                    connectedPeers.add(c.peer);
+                    updateConnectedCount();
+                });
+
+                c.on('close', () => {
+                    connectedPeers.delete(c.peer);
+                    updateConnectedCount();
+                });
+
                 c.on('data', (data) => {
                     if (data.type === 'wish') {
                         addStudentFromMobile(data.wish);
                     }
                 });
             });
+
+            peer.on('error', (err) => {
+                console.error("PeerJS Error:", err);
+                document.getElementById('lobby-id').innerText = "Fehler: " + err.type;
+                document.getElementById('lobby-id').style.background = "var(--danger)";
+            });
+        }
+
+        function updateConnectedCount() {
+            const countEl = document.getElementById('connected-count');
+            if (countEl) countEl.innerText = "Verbundene Schüler: " + connectedPeers.size;
         }
 
         function toggleQRModal() {
@@ -544,14 +577,41 @@
         }
 
         function initStudentMode(hId) {
-            peer = new Peer();
+            peer = new Peer(undefined, PEER_CONFIG);
+            
+            document.getElementById('submit-status').innerText = "Verbinde zum Lehrer...";
+            
             peer.on('open', (id) => {
-                conn = peer.connect(hId);
-                conn.on('open', () => {
-                   document.getElementById('submit-status').innerText = "Verbunden mit Lehrer";
-                   document.getElementById('submit-status').style.color = "var(--success)";
-                });
+                tryConnection(hId);
             });
+
+            peer.on('error', (err) => {
+                console.error("Student Peer Error:", err);
+                if (err.type === 'peer-unavailable') {
+                    document.getElementById('submit-status').innerText = "Lehrer nicht gefunden. QR-Code am PC ist evtl. veraltet.";
+                } else {
+                    document.getElementById('submit-status').innerText = "Verbindungsfehler: " + err.type;
+                }
+                document.getElementById('submit-status').style.color = "var(--danger)";
+            });
+        }
+
+        function tryConnection(hId) {
+            conn = peer.connect(hId, {
+                reliable: true
+            });
+
+            conn.on('open', () => {
+                document.getElementById('submit-status').innerText = "Verbunden mit Lehrer";
+                document.getElementById('submit-status').style.color = "var(--success)";
+            });
+
+            conn.on('close', () => {
+                document.getElementById('submit-status').innerText = "Verbindung unterbrochen. Versuche Reconnect...";
+                document.getElementById('submit-status').style.color = "var(--text-muted)";
+                setTimeout(() => tryConnection(hId), 3000);
+            });
+        }
 
             document.getElementById('submit-wish-btn').addEventListener('click', () => {
                 const name = document.getElementById('m-name').value.trim();
