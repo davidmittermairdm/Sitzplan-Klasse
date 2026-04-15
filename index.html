@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sitzplan Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        :root {
+            --bg-grad-1: #0f172a;
+            --bg-grad-2: #312e81;
+            --panel-bg: rgba(30, 41, 59, 0.6);
+            --panel-border: rgba(255, 255, 255, 0.1);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-grad-1), var(--bg-grad-2));
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        input, select {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+
+        .row-col-inputs {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .row-col-inputs > div {
+            flex: 1;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            width: 100%;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        button.danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .student-item {
+            display: grid;
+            grid-template-columns: 2fr 2fr 2fr auto;
+            gap: 0.75rem;
+            align-items: end;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .student-item input, .student-item select {
+            width: 100%;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .student-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--panel-border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .classroom-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+
+        .tafel {
+            background: #1e293b;
+            color: white;
+            padding: 1rem 4rem;
+            border-radius: 8px;
+            border: 2px solid #334155;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .grid {
+            display: grid;
+            gap: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+        }
+
+        .desk {
+            background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
+            color: #0f172a;
+            border-radius: 8px;
+            padding: 1rem;
+            min-width: 100px;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            transition: transform 0.3s;
+        }
+
+        .desk:hover {
+            transform: scale(1.05);
+        }
+
+        .desk.empty {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed var(--panel-border);
+            color: transparent;
+            box-shadow: none;
+        }
+
+        .desk .name {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .desk .info {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .score-display {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 1rem;
+        }
+
+        /* Mobile specific styles */
+        #student-view {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #qrcode img {
+            max-width: 150px;
+        }
+
+        .lobby-info {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--primary);
+            color: white;
+        }
+
+        /* QR Zoom Modal */
+        #qr-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            cursor: pointer;
+        }
+
+        #qr-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(99, 102, 241, 0.4);
+        }
+
+        #qr-modal #qrcode-large canvas, #qr-modal #qrcode-large img {
+            width: 400px !important;
+            height: 400px !important;
+        }
+
+        .zoom-hint {
+            margin-top: 20px;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        #teacher-view {
+            display: block; /* Default to teacher view */
+            width: 100%;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="teacher-view">
+        <h1>Sitzplan Generator</h1>
+        <p class="subtitle">Berechne die ideale Sitzordnung basierend auf den Wünschen der Schüler</p>
+
+        <div class="container">
+            <!-- Settings Panel -->
+            <div class="glass-panel">
+                <h2>1. Raum & Schüler Setup</h2>
+                
+                <div class="row-col-inputs">
+                    <div class="form-group">
+                        <label>Spalten (Breite)</label>
+                        <input type="number" id="cols" min="1" max="10" value="4">
+                    </div>
+                    <div class="form-group">
+                        <label>Reihen (Tiefe)</label>
+                        <input type="number" id="rows" min="1" max="10" value="5">
+                    </div>
+                </div>
+
+                <div class="form-group" style="flex-direction:row; justify-content:space-between; align-items:center; margin-top: 1.5rem;">
+                    <label>Schüler (Max. <span id="max-students">20</span>)</label>
+                    <button type="button" id="add-student-btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.8rem;">+ Schüler</button>
+                </div>
+
+                <div class="student-list" id="student-list">
+                    <!-- Student Items will be injected here -->
+                </div>
+
+                <div class="glass-panel" style="margin-top: 1rem; border: 1px dashed var(--primary);">
+                    <div class="lobby-info">
+                        <strong>Live-Eingabe für Schüler</strong><br>
+                        Scannt den Code, um Wünsche vom Handy zu senden:
+                    </div>
+                    <div id="qrcode-container" class="qr-container" style="cursor: zoom-in;" onclick="toggleQRModal()">
+                        <div id="qrcode"></div>
+                        <span id="lobby-id" class="status-badge">Verbinde...</span>
+                        <div style="font-size: 0.6rem; color: #64748b; margin-top: 5px;">Klicken zum Vergrößern</div>
+                    </div>
+                </div>
+
+                <button id="calculate-btn" style="margin-top: 1rem;">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Idealen Sitzplan berechnen
+                </button>
+            </div>
+
+            <!-- Result Panel -->
+            <div class="glass-panel">
+                <h2>2. Generierter Sitzplan</h2>
+                
+                <div class="classroom-container">
+                    <div class="tafel">LEHRERPULT / TAFEL</div>
+                    <div class="grid" id="classroom-grid">
+                        <!-- Grid will be injected here -->
+                    </div>
+                    <div id="score-display"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="student-view" class="glass-panel" style="margin: 0 auto;">
+        <h1>Deine Wünsche</h1>
+        <p class="subtitle">Trage hier ein, neben wem du gerne sitzen möchtest.</p>
+        
+        <div class="form-group">
+            <label>Dein Name</label>
+            <input type="text" id="m-name" placeholder="Gib deinen Namen ein">
+        </div>
+
+        <div class="form-group">
+            <label>Wunsch-Nachbar</label>
+            <input type="text" id="m-neighbor" placeholder="Wer soll neben dir sitzen?">
+        </div>
+
+        <div class="form-group">
+            <label>Bevorzugte Position</label>
+            <select id="m-position">
+                <option value="egal">Egal</option>
+                <option value="vorne">Vorne (bei der Tafel)</option>
+                <option value="hinten">Hinten (letzte Reihe)</option>
+                <option value="fenster">Fenster (Links)</option>
+                <option value="tuer">Tür (Rechts)</option>
+            </select>
+        </div>
+
+        <div id="submit-status" style="margin-top: 10px; font-size: 0.9rem; text-align: center;"></div>
+    </div>
+
+    <!-- QR Modal -->
+    <div id="qr-modal" onclick="toggleQRModal()">
+        <h2 style="margin-bottom: 20px; color: white;">QR-Code scannen</h2>
+        <div id="qr-modal-content">
+            <div id="qrcode-large"></div>
+        </div>
+        <div class="zoom-hint">Zum Schließen klicken</div>
+    </div>
+
+    <script>
+        // --- PeerJS & QR Setup ---
+        let peer = null;
+        let conn = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const hostId = urlParams.get('host');
+
+        if (hostId) {
+            // Student Mode
+            document.getElementById('teacher-view').classList.add('hidden');
+            document.getElementById('student-view').style.display = 'flex';
+            initStudentMode(hostId);
+        } else {
+            // Teacher Mode
+            initTeacherMode();
+        }
+
+        function initTeacherMode() {
+            peer = new Peer();
+            peer.on('open', (id) => {
+                document.getElementById('lobby-id').innerText = "Bereit (Code aktiv)";
+                let currentUrl = window.location.href.split('?')[0];
+                
+                // Warning if opened via file:// protocol
+                if (window.location.protocol === 'file:') {
+                    document.getElementById('lobby-id').innerText = "Vorschau-Modus";
+                    document.getElementById('lobby-id').style.background = "var(--danger)";
+                    const warning = document.createElement('div');
+                    warning.className = 'glass-panel';
+                    warning.style.fontSize = "0.75rem";
+                    warning.style.color = "#ff9999";
+                    warning.style.marginTop = "10px";
+                    warning.style.border = "1px solid var(--danger)";
+                    warning.style.padding = "10px";
+                    warning.innerHTML = `<strong>QR-Code Hilfe:</strong><br>Du hast die Datei direkt vom PC geöffnet. <br><br>Damit Schüler mit dem Handy darauf zugreifen können, nutze den <b>'Live Server'</b> in VS Code oder lade die Datei auf <b>GitHub Pages</b> hoch.`;
+                    document.getElementById('qrcode-container').appendChild(warning);
+                }
+
+                const qrUrl = `${currentUrl}?host=${id}`;
+                
+                // Normaler QR-Code
+                new QRCode(document.getElementById("qrcode"), {
+                    text: qrUrl,
+                    width: 128,
+                    height: 128
+                });
+
+                // Großer QR-Code für Modal
+                new QRCode(document.getElementById("qrcode-large"), {
+                    text: qrUrl,
+                    width: 400,
+                    height: 400
+                });
+            });
+
+            peer.on('connection', (c) => {
+                c.on('data', (data) => {
+                    if (data.type === 'wish') {
+                        addStudentFromMobile(data.wish);
+                    }
+                });
+            });
+        }
+
+        function toggleQRModal() {
+            const modal = document.getElementById('qr-modal');
+            if (modal.style.display === 'flex') {
+                modal.style.display = 'none';
+            } else {
+                modal.style.display = 'flex';
+            }
+        }
+
+        function initStudentMode(hId) {
+            peer = new Peer();
+            peer.on('open', (id) => {
+                conn = peer.connect(hId);
+                conn.on('open', () => {
+                   document.getElementById('submit-status').innerText = "Verbunden mit Lehrer";
+                   document.getElementById('submit-status').style.color = "var(--success)";
+                });
+            });
+
+            document.getElementById('submit-wish-btn').addEventListener('click', () => {
+                const name = document.getElementById('m-name').value.trim();
+                const neighbor = document.getElementById('m-neighbor').value.trim();
+                const position = document.getElementById('m-position').value;
+
+                if (!name) {
+                    alert("Bitte gib deinen Namen ein.");
+                    return;
+                }
+
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'wish',
+                        wish: { name, neighbor, position }
+                    });
+                    document.getElementById('submit-wish-btn').disabled = true;
+                    document.getElementById('submit-wish-btn').innerText = "Gesendet!";
+                    document.getElementById('submit-status').innerText = "Deine Wünsche wurden übertragen!";
+                } else {
+                    alert("Keine Verbindung zum Lehrer möglich. Bitte lade die Seite neu.");
+                }
+            });
+        }
+
+        function addStudentFromMobile(wish) {
+            // Check if student already exists (by name)
+            const existingNames = Array.from(document.querySelectorAll('.s-name')).map(i => i.value.toLowerCase());
+            if (existingNames.includes(wish.name.toLowerCase())) {
+                // Update existing
+                const items = document.querySelectorAll('.student-item');
+                items.forEach(item => {
+                    if (item.querySelector('.s-name').value.toLowerCase() === wish.name.toLowerCase()) {
+                        item.querySelector('.s-neighbor').value = wish.neighbor;
+                        item.querySelector('.s-position').value = wish.position;
+                    }
+                });
+            } else {
+                // Add new
+                const id = 'student_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+                const el = createStudentElement(id);
+                el.querySelector('.s-name').value = wish.name;
+                el.querySelector('.s-neighbor').value = wish.neighbor;
+                el.querySelector('.s-position').value = wish.position;
+                studentListEl.appendChild(el);
+            }
+        }
+
+        // --- Original App Logic ---
+        let students = [];
+        let numRows = 5;
+        let numCols = 4;
+
+        const maxStudentsSpan = document.getElementById('max-students');
+        const rowsInput = document.getElementById('rows');
+        const colsInput = document.getElementById('cols');
+        const studentListEl = document.getElementById('student-list');
+        const addStudentBtn = document.getElementById('add-student-btn');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const classroomGrid = document.getElementById('classroom-grid');
+        const scoreDisplay = document.getElementById('score-display');
+
+        // Initial setup
+        updateMaxStudents();
+
+        rowsInput.addEventListener('change', updateMaxStudents);
+        colsInput.addEventListener('change', updateMaxStudents);
+
+        function updateMaxStudents() {
+            numRows = parseInt(rowsInput.value) || 5;
+            numCols = parseInt(colsInput.value) || 4;
+            maxStudentsSpan.innerText = numRows * numCols;
+        }
+
+        function createStudentElement(id) {
+            const div = document.createElement('div');
+            div.className = 'student-item';
+            div.dataset.id = id;
+            
+            div.innerHTML = `
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" placeholder="Name" class="s-name">
+                </div>
+                <!-- Wünsche werden nur im Hintergrund gespeichert, um die Ansicht sauber zu halten -->
+                <div class="form-group" style="display: none;">
+                    <label>Wunsch 1 (Neben)</label>
+                    <input type="text" placeholder="Name d. Nachbarn" class="s-neighbor">
+                </div>
+                <div class="form-group" style="display: none;">
+                    <label>Wunsch 2 (Position)</label>
+                    <select class="s-position">
+                        <option value="egal">Egal</option>
+                        <option value="vorne">Vorne</option>
+                        <option value="hinten">Hinten</option>
+                        <option value="fenster">Fenster (Links)</option>
+                        <option value="tuer">Tür (Rechts)</option>
+                    </select>
+                </div>
+                <button class="danger" onclick="removeStudent('${id}')" style="margin-bottom: 2px;">X</button>
+            `;
+            return div;
+        }
+
+        addStudentBtn.addEventListener('click', () => {
+            const currentCount = studentListEl.children.length;
+            if (currentCount >= numRows * numCols) {
+                alert("Nicht genug Sitzplätze! Erhöhe Reihen oder Spalten.");
+                return;
+            }
+            const id = 'student_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+            studentListEl.appendChild(createStudentElement(id));
+        });
+
+        window.removeStudent = function(id) {
+            const el = document.querySelector(`.student-item[data-id="${id}"]`);
+            if (el) el.remove();
+        }
+
+        // --- Standardmäßige Testdaten für den Start (optional) ---
+        function populateTestData() {
+            const testNames = ["Alex", "Berta", "Chris", "Dora", "Emil", "Fiona", "Gustav", "Hanna"];
+            testNames.forEach(name => {
+                const id = 'student_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+                const el = createStudentElement(id);
+                el.querySelector('.s-name').value = name;
+                studentListEl.appendChild(el);
+            });
+            // Add some wishes
+            document.querySelectorAll('.student-item')[0].querySelector('.s-neighbor').value = "Berta";
+            document.querySelectorAll('.student-item')[0].querySelector('.s-position').value = "vorne";
+            document.querySelectorAll('.student-item')[1].querySelector('.s-neighbor').value = "Alex";
+            document.querySelectorAll('.student-item')[2].querySelector('.s-position').value = "hinten";
+            document.querySelectorAll('.student-item')[3].querySelector('.s-position').value = "fenster";
+        }
+        populateTestData();
+
+        // --- Algorithmus ---
+        calculateBtn.addEventListener('click', () => {
+            // 1. Gather Data
+            numRows = parseInt(rowsInput.value) || 5;
+            numCols = parseInt(colsInput.value) || 4;
+            const capacity = numRows * numCols;
+            
+            const studentItems = document.querySelectorAll('.student-item');
+            students = [];
+            studentItems.forEach(item => {
+                const name = item.querySelector('.s-name').value.trim();
+                const neighbor = item.querySelector('.s-neighbor').value.trim();
+                const position = item.querySelector('.s-position').value;
+                if (name) {
+                    students.push({ 
+                        name, 
+                        nameLower: name.toLowerCase(),
+                        neighbor: neighbor.toLowerCase(), 
+                        position 
+                    });
+                }
+            });
+
+            if (students.length === 0) {
+                alert("Bitte füge zuerst Schüler hinzu!");
+                return;
+            }
+
+            if (students.length > capacity) {
+                alert("Es gibt mehr Schüler als Sitzplätze.");
+                return;
+            }
+
+            // 2. Optimization (Hill Climbing with Restarts)
+            calculateBtn.innerText = "Berechne...";
+            
+            setTimeout(() => {
+                let bestArrangement = null;
+                let bestScore = -Infinity;
+
+                // Run 100 restarts
+                for (let i = 0; i < 100; i++) {
+                    let arrangement = buildInitialArrangement(students, capacity);
+                    arrangement = optimize(arrangement, numRows, numCols, students);
+                    let score = evaluate(arrangement, numRows, numCols);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestArrangement = [...arrangement];
+                    }
+                }
+
+                renderClassroom(bestArrangement, numRows, numCols, bestScore);
+                calculateBtn.innerHTML = `<svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg> Erneut optimieren`;
+            }, 50);
+        });
+
+        function buildInitialArrangement(studentList, capacity) {
+            let arr = new Array(capacity).fill(null);
+            for (let i = 0; i < studentList.length; i++) {
+                arr[i] = studentList[i];
+            }
+            // Shuffle
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function optimize(arr, rows, cols, studentList) {
+            let currentScore = evaluate(arr, rows, cols);
+            let improved = true;
+            let iterations = 0;
+
+            // Simple Hill Climbing
+            while (improved && iterations < 1000) {
+                improved = false;
+                iterations++;
+
+                // Try swapping random pairs
+                for (let j = 0; j < 200; j++) {
+                    let idx1 = Math.floor(Math.random() * arr.length);
+                    let idx2 = Math.floor(Math.random() * arr.length);
+                    
+                    if (idx1 === idx2) continue;
+
+                    // Swap
+                    let temp = arr[idx1];
+                    arr[idx1] = arr[idx2];
+                    arr[idx2] = temp;
+                    
+                    let newScore = evaluate(arr, rows, cols);
+                    if (newScore > currentScore) {
+                        currentScore = newScore;
+                        improved = true;
+                    } else {
+                        // Undo swap
+                        temp = arr[idx1];
+                        arr[idx1] = arr[idx2];
+                        arr[idx2] = temp;
+                    }
+                }
+            }
+            return arr;
+        }
+
+        function evaluate(arr, rows, cols) {
+            let score = 0;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    let idx = r * cols + c;
+                    let student = arr[idx];
+                    if (!student) continue;
+
+                    // Check Position Wish (5 points)
+                    if (student.position === 'vorne' && r === 0) score += 5;
+                    if (student.position === 'hinten' && r === rows - 1) score += 5;
+                    if (student.position === 'fenster' && c === 0) score += 5; // Window is now Left
+                    if (student.position === 'tuer' && c === cols - 1) score += 5; // Door is now Right
+
+                    // Check Neighbor Wish (10 points)
+                    if (student.neighbor) {
+                        let isNeighborAdjacent = false;
+                        // Check left, right, top, bottom, diagonals
+                        const neighborsOffsets = [
+                            [-1, 0], [1, 0], [0, -1], [0, 1],
+                            [-1, -1], [-1, 1], [1, -1], [1, 1]
+                        ];
+                        for (let off of neighborsOffsets) {
+                            let nr = r + off[0];
+                            let nc = c + off[1];
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                                let nIdx = nr * cols + nc;
+                                let nStudent = arr[nIdx];
+                                if (nStudent && nStudent.nameLower === student.neighbor) {
+                                    isNeighborAdjacent = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (isNeighborAdjacent) {
+                            score += 10;
+                        }
+                    }
+                }
+            }
+            return score;
+        }
+
+        function renderClassroom(arr, rows, cols, score) {
+            classroomGrid.innerHTML = '';
+            classroomGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    let idx = r * cols + c;
+                    let student = arr[idx];
+                    
+                    const desk = document.createElement('div');
+                    desk.className = 'desk';
+                    
+                    if (student) {
+                        desk.innerHTML = `
+                            <div class="name">${student.name}</div>
+                            <div class="info">${student.position !== 'egal' ? '(Pos: ' + student.position + ')' : ''}</div>
+                        `;
+                    } else {
+                        desk.classList.add('empty');
+                        desk.innerText = "Leer";
+                    }
+                    classroomGrid.appendChild(desk);
+                }
+            }
+
+            scoreDisplay.innerHTML = `
+                <div class="score-display">Zufriedenheits-Score: ${score} Punkte</div>
+                <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 5px;">Höhere Punktzahl bedeutet, dass mehr Wünsche erfüllt wurden.</p>
+            `;
+        }
+    </script>
+</body>
+</html>
